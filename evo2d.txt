@@ -1,0 +1,320 @@
+/* evo2d by Brennan Wallace 
+*
+*  This program demonstrates a simple ecosystem. Predators eat boids or will die. 
+*  Boids may die or migrate by movement. Both will die from age.They reproduce and
+*  The offspring have similar characteristics simulating evolution. 
+*/
+
+Flock flock;
+pFlock pflock;
+int height = 700;
+int width = 850;
+int numberKilled = 0 ;
+int numberMigrated = 0;
+int startingNumber = 60;
+int numberBorn = startingNumber;
+int oldAgeDeaths = 0;
+int maxAge = 600;
+int pMaxAge = 2000;
+int rBoundry = 530;
+int pFoodAmount = 200;
+int globalSpeed = 1;
+int lBoundry = 50;
+int tBoundry = 50;
+int bBoundry = height - tBoundry; //kepps them even
+int wordPadding = 40;
+int wordLeft = wordPadding ;
+int GRNumeratorP = 1000;
+int GRDenominatorP = 999;
+int GRNumerator = 1000;
+int GRDenominator = 992;
+int rNumerator = 1000;
+color white = color(255);
+color fontColor = color(0, 102, 153);
+int textSize1 = 32;
+int textSize2 = textSize1 -10;
+void setup() {
+
+  size(width, height);
+
+  flock = new Flock(globalSpeed, GRNumerator, GRDenominator );
+  pflock = new pFlock(globalSpeed, GRNumeratorP, GRDenominatorP );
+  for (int i = 0; i < startingNumber; i++) {
+
+    flock.addBoid(new Boid( i*10 + 5, height/2, random(10)/10, random(10)/10, 1));
+  }
+  for (int i = 0; i < startingNumber/5; i++) {
+
+    pflock.addpBoid(new pBoid( i*10 + 5, height/2, random(10)/10, random(10)/10, pFoodAmount));
+  }
+}
+
+void draw() {
+
+
+  background(white);
+
+
+
+  textSize(textSize1);
+  fill(fontColor  );
+
+  //set up info on the right side Boid info only NOT Boid
+  text("Killed " + numberKilled, rBoundry + wordPadding, 300); 
+  text("Age Deaths " + oldAgeDeaths, rBoundry + wordPadding, 400); 
+  text("Migrated " + numberMigrated, rBoundry + wordPadding, 350); 
+  text("Born " + numberBorn, rBoundry + wordPadding, 250); 
+  text("Alive " + (numberBorn - numberMigrated - numberKilled - oldAgeDeaths), rBoundry + wordPadding, 200);
+  text(millis()/1000, rBoundry + wordPadding, 100); //timer
+  textSize(textSize2);
+  text("Top: Migration", rBoundry + wordPadding, 550);
+  text("Bottom: Death", rBoundry + wordPadding, 600);
+  text("Sides: Loop", rBoundry + wordPadding, 650);
+  flock.run();
+  pflock.run();
+}
+
+
+
+
+
+//predators
+
+class pFlock {
+
+  ArrayList pboids; // An arraylist for all the boids
+  int speed, rNumerator, rDenominator;
+
+
+  pFlock(int tSpeed, int tRNumerator, int tRDenomiator) {
+    speed = tSpeed;
+    rNumerator = tRNumerator;
+    rDenominator = tRDenomiator;
+
+    pboids = new ArrayList(); // Initialize the arraylist
+  }
+
+
+
+  void run() {
+
+    for (int i = 0; i < pboids.size(); i++) {
+
+      pBoid b = (pBoid) pboids.get(i);  
+
+      b.bRun();  
+
+      b.age++;
+
+      for (int h = 0; h < flock.boids.size(); h++) {
+
+        Boid prey = (Boid) flock.boids.get(h);  
+        if (((b.xpos - 15  < prey.xpos) && ( prey.xpos < b.xpos + 15)) && ((b.ypos - 15  < prey.ypos) && ( prey.ypos < b.ypos + 15))) {
+
+          flock.boids.remove(h);
+          b.food += 100;
+          numberKilled++;
+        }
+      }
+      b.food--;
+
+      if (b.food < 0) {
+        pboids.remove(i);
+      } 
+
+      if (b.xpos < lBoundry || b.xpos > rBoundry)
+      {
+        b.xpos = rBoundry/2;
+      }
+      if (b.ypos < 100 || b.ypos > height - 100)
+      {
+        b.ypos = height/2;
+      }
+
+      //age death of pBoid
+      if (b.age > pMaxAge) {
+        pboids.remove(i);
+      } 
+
+      //reproduction
+      if (random(rNumerator) > rDenominator - b.food/10 ) {
+        float newYTendency = b.yTendency + b.yTendency * (1 + random(10)/10) - b.yTendency * (1 + random(10)/10);
+        float newXTendency = b.xTendency + b.xTendency * (1 + random(10)/10) - b.xTendency * (1 + random(10)/10);
+        pflock.addpBoid(new pBoid( b.xpos, b.ypos, newYTendency, newXTendency, speed));
+      }
+
+      b.pDisplay();
+    }
+  }
+
+
+  void addpBoid(pBoid b) {
+
+    pboids.add(b);
+  }
+}
+
+
+//nonpredators
+class Flock {
+
+  ArrayList boids; // An arraylist for all the boids
+
+    int speed, rNumerator, rDenominator ;
+
+  Flock(int tSpeed, int tRNumerator, int tRDenominator ) {
+
+    speed = tSpeed;
+    rNumerator = tRNumerator;
+    rDenominator = tRDenominator;
+
+    boids = new ArrayList(); // Initialize the arraylist
+  }
+
+
+
+  void run() {
+
+    for (int i = 0; i < boids.size(); i++) {
+
+      Boid b = (Boid) boids.get(i);  
+
+      b.bRun();  
+
+      b.age++;
+
+
+      if (b.age > maxAge) {
+        oldAgeDeaths++;
+        boids.remove(i);
+      } 
+
+
+      else if (b.ypos > bBoundry) {
+        numberKilled++;
+        boids.remove(i);
+      }
+
+      else if (b.xpos < lBoundry) {
+
+        b.xpos = rBoundry;
+      }
+
+      else if (b.xpos > rBoundry) {
+
+        b.xpos = lBoundry;
+      }
+
+      else if ( b.ypos < tBoundry) {
+        numberMigrated++;
+        boids.remove(i);
+      }
+      if (random(rNumerator) > rDenominator ) {
+        float newYTendency = b.yTendency + b.yTendency * (1 + random(10)/10) - b.yTendency * (1 + random(10)/10);
+        float newXTendency = b.xTendency + b.xTendency * (1 + random(10)/10) - b.xTendency * (1 + random(10)/10);
+        flock.addBoid(new Boid( b.xpos, b.ypos, newYTendency, newXTendency, speed));
+        numberBorn++;
+      }
+
+      b.display();
+    }
+  }
+
+  
+  void addBoid(Boid b) {
+
+    boids.add(b);
+  }
+}
+
+
+
+class pBoid extends Boid {
+
+  int food;
+
+  pBoid( float tempXpos, float tempYpos, float tempYTendency, float tempXTendency, int foodStart) { 
+    super(tempXpos, tempYpos, tempYTendency, tempXTendency, globalSpeed * 2);
+    food = foodStart;
+  }
+
+
+
+  
+  void pDisplay() {
+    fill(c);
+    ellipseMode(CENTER);
+    ellipse(xpos, ypos, 30, 30);
+  }
+}
+
+
+//creates a Pboid on a release click
+void mouseReleased() {
+  if (mouseX < rBoundry && mouseX > lBoundry && mouseY < bBoundry && mouseX > tBoundry); //only in the boid zone
+  pflock.addpBoid(new pBoid( mouseX, mouseY, random(10)/10, random(10)/10, pFoodAmount)); //add a pBoid at mouse
+}
+
+
+
+
+// Even though there are multiple objects, we still only need one class. 
+// No matter how many cookies we make, only one cookie cutter is needed.
+class Boid { 
+  color c;
+  float xpos;
+  float ypos;
+  float yTendency;
+  float xTendency;
+  int age;
+  int mRate;
+
+  // The Constructor is defined with arguments.
+  Boid(float tempXpos, float tempYpos, float tempYTendency, float tempXTendency, int speed) { 
+    c = color(0, 100 + (tempXTendency * 100), 100 + (tempYTendency * 100));
+    xpos = tempXpos;
+    ypos = tempYpos;
+    yTendency = tempYTendency;
+    xTendency = tempXTendency;
+    mRate = speed;
+  }
+
+  void display() { //display as small boxes
+    noStroke();
+    fill(c);
+    rectMode(CENTER);
+    rect(xpos, ypos, 10, 10);
+  }
+
+  void bRun() {
+    if (yTendency * 2 * random(10) < 5) { //50% chance to move right or left
+      ypos +=  mRate;
+    }
+    else {
+      ypos -= mRate;
+    }
+    if (xTendency * 2 * random(10) < 5) { //50% chance to move up or down
+      xpos +=  mRate;
+    }
+    else {
+      xpos -= mRate;
+    }
+  }
+}
+//alter constants
+
+/*Many thanks and credits to the following demos which I altered/learned from:
+ *
+ *  http://processing.org/tutorials/objects/ by Daniel Shiffman
+ *  http://processingjs.org/learning/topic/flocking/ by Daniel Shiffman
+ *  
+ *  Starting with examples especially in an unfamilar system is often the best way to go.
+ *
+ * More charteristics
+ * Fight for food
+ *  Ways to expand this (better grazinging areas on x axis and/or y)
+ *  sexual reprduction (just get the next in the list)
+ */
+
+
+
